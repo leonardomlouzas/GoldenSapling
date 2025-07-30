@@ -10,13 +10,16 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/leonardomlouzas/GoldenSapling/internal/automation"
 	"github.com/leonardomlouzas/GoldenSapling/internal/commands"
 	"github.com/leonardomlouzas/GoldenSapling/internal/config"
 )
 
 type Bot struct {
-	Session *discordgo.Session
-	Config  *config.Config
+	Session   *discordgo.Session
+	Config    *config.Config
+	AutoBan   *automation.AutoBan
+	LinkFixer *automation.LinkFixer
 }
 
 func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
@@ -49,9 +52,17 @@ func New(cfg *config.Config) (*Bot, error) {
 		return nil, err
 	}
 
+	autoBanService := automation.NewAutoBan(cfg)
+	linkFixerService, err := automation.NewLinkFixer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LinkFixer service: %w", err)
+	}
+
 	return &Bot{
-		Session: dg,
-		Config:  cfg,
+		Session:   dg,
+		Config:    cfg,
+		AutoBan:   autoBanService,
+		LinkFixer: linkFixerService,
 	}, nil
 }
 
@@ -124,8 +135,10 @@ Runs the Discord bot, setting up event handlers and starting the session.
 func (b *Bot) Run() {
 	b.Session.AddHandler(b.ready)
 	b.Session.AddHandler(b.interactionCreate)
+	b.Session.AddHandler(b.AutoBan.MessageCreateHandler)
+	b.Session.AddHandler(b.LinkFixer.MessageCreateHandler)
 
-	b.Session.Identify.Intents = discordgo.IntentsGuilds
+	b.Session.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages
 
 	err := b.Session.Open()
 	if err != nil {

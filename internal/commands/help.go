@@ -15,8 +15,8 @@ func HelpDiscord() *discordgo.MessageEmbed {
 			{Name: "/leaderboard", Value: "Displays the leaderboard of the map if used in a movement map channel.", Inline: true},
 			{Name: "/personal_best {nick}", Value: "Displays the personal best for a player if used in a movement map channel.", Inline: true},
 			{Name: "/personal_total_runs {nick}", Value: "Displays the total amount of runs for a player if used in a movement map channel.", Inline: true},
-			{Name: "X/Reddit links", Value: "This bot look for links sent by user and replies with a better link with working embed media.", Inline: true},
-			{Name: "Automatic bans", Value: "This bot look for common spam/scam words sent by users and automatically bans them.", Inline: true},
+			{Name: "Link Fixing", Value: "This bot looks for X (Twitter) and Reddit links and replies with a version that provides a better media embed.", Inline: true},
+			{Name: "Automatic bans", Value: "This bot looks for common spam/scam words sent by users and automatically bans them.", Inline: true},
 		},
 		Footer: &discordgo.MessageEmbedFooter{Text: "Made by: L"},
 	}
