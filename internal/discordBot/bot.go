@@ -16,10 +16,11 @@ import (
 )
 
 type Bot struct {
-	Session   *discordgo.Session
-	Config    *config.Config
-	AutoBan   *automation.AutoBan
-	LinkFixer *automation.LinkFixer
+	Session       *discordgo.Session
+	Config        *config.Config
+	AutoBan       *automation.AutoBan
+	LinkFixer     *automation.LinkFixer
+	PlayerCounter *automation.PlayerCounter
 }
 
 func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
@@ -52,6 +53,7 @@ func New(cfg *config.Config) (*Bot, error) {
 		return nil, err
 	}
 
+	playerCounterService := automation.NewPlayerCounter(dg, cfg)
 	autoBanService := automation.NewAutoBan(cfg)
 	linkFixerService, err := automation.NewLinkFixer()
 	if err != nil {
@@ -59,10 +61,11 @@ func New(cfg *config.Config) (*Bot, error) {
 	}
 
 	return &Bot{
-		Session:   dg,
-		Config:    cfg,
-		AutoBan:   autoBanService,
-		LinkFixer: linkFixerService,
+		Session:       dg,
+		Config:        cfg,
+		AutoBan:       autoBanService,
+		LinkFixer:     linkFixerService,
+		PlayerCounter: playerCounterService,
 	}, nil
 }
 
@@ -162,7 +165,8 @@ Handles the bot's ready event, which is triggered when the bot has successfully 
 func (b *Bot) ready(s *discordgo.Session, event *discordgo.Ready) {
 	s.UpdateGameStatus(0, "Managing Movement HUB")
 	b.syncAndCleanCommands()
-	log.Println("[DISCORD] Bot is ready")
+	b.PlayerCounter.Start()
+	log.Println("[DISCORD] Bot is ready!")
 }
 
 /*
