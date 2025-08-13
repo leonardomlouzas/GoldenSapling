@@ -1,1 +1,1 @@
-players_online: 5
+players_online: 7

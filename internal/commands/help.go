@@ -12,7 +12,6 @@ func HelpDiscord() *discordgo.MessageEmbed {
 		Color:       0xffa600,
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: "/help", Value: "Shows this help message.", Inline: true},
-			{Name: "/leaderboard", Value: "Displays the leaderboard of the map if used in a movement map channel.", Inline: true},
 			{Name: "/personal_best {nick}", Value: "Displays the personal best for a player if used in a movement map channel.", Inline: true},
 			{Name: "/personal_total_runs {nick}", Value: "Displays the total amount of runs for a player if used in a movement map channel.", Inline: true},
 			{Name: "Link Fixing", Value: "This bot looks for X (Twitter) and Reddit links and replies with a version that provides a better media embed.", Inline: true},

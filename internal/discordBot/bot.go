@@ -21,6 +21,7 @@ type Bot struct {
 	AutoBan       *automation.AutoBan
 	LinkFixer     *automation.LinkFixer
 	PlayerCounter *automation.PlayerCounter
+	TempMessenger *automation.TempMessenger
 }
 
 func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
@@ -36,10 +37,23 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 Generates a hash for command duplication checks
 */
 func hashCommand(cmd *discordgo.ApplicationCommand) string {
-	cmdCopy := *cmd
-	cmdCopy.ID = ""
+	comparable := struct {
+		Name        string                                `json:"name"`
+		Description string                                `json:"description"`
+		Options     []*discordgo.ApplicationCommandOption `json:"options,omitempty"`
+		Type        discordgo.ApplicationCommandType      `json:"type,omitempty"`
+	}{
+		Name:        cmd.Name,
+		Description: cmd.Description,
+		Options:     cmd.Options,
+		Type:        cmd.Type,
+	}
 
-	b, _ := json.Marshal(cmdCopy)
+	if comparable.Type == 0 {
+		comparable.Type = discordgo.ChatApplicationCommand
+	}
+
+	b, _ := json.Marshal(comparable)
 	h := sha256.Sum256(b)
 	return fmt.Sprintf("%x", h)
 }
@@ -59,6 +73,7 @@ func New(cfg *config.Config) (*Bot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LinkFixer service: %w", err)
 	}
+	tempMessengerService := automation.NewTempMessenger()
 
 	return &Bot{
 		Session:       dg,
@@ -66,6 +81,7 @@ func New(cfg *config.Config) (*Bot, error) {
 		AutoBan:       autoBanService,
 		LinkFixer:     linkFixerService,
 		PlayerCounter: playerCounterService,
+		TempMessenger: tempMessengerService,
 	}, nil
 }
 
@@ -129,7 +145,6 @@ func (b *Bot) syncAndCleanCommands() {
 			}
 		}
 	}
-	log.Println("[DISCORD] Command synchronization complete.")
 }
 
 /*
@@ -140,6 +155,7 @@ func (b *Bot) Run() {
 	b.Session.AddHandler(b.interactionCreate)
 	b.Session.AddHandler(b.AutoBan.MessageCreateHandler)
 	b.Session.AddHandler(b.LinkFixer.MessageCreateHandler)
+	b.Session.AddHandler(b.TempMessenger.MessageCreateHandler)
 
 	b.Session.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages
 
@@ -192,3 +208,5 @@ func (b *Bot) handleHelpCommand(s *discordgo.Session, i *discordgo.InteractionCr
 		log.Printf("[DISCORD] Failed to respond to help command: %v", err)
 	}
 }
+
+// TODO: CHECK IF UPDATED COMMAND MMESSAGE IS STILL SHOWING UP AND MAKE LEADERBOARD AUTOMATION WORK
