@@ -2,6 +2,7 @@ package discordbot
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"github.com/leonardomlouzas/GoldenSapling/internal/automation"
 	"github.com/leonardomlouzas/GoldenSapling/internal/commands"
 	"github.com/leonardomlouzas/GoldenSapling/internal/config"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Bot struct {
@@ -22,6 +24,8 @@ type Bot struct {
 	LinkFixer     *automation.LinkFixer
 	PlayerCounter *automation.PlayerCounter
 	TempMessenger *automation.TempMessenger
+	Leaderboarder *automation.Leaderboard
+	DB            *sql.DB
 }
 
 func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
@@ -29,6 +33,30 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 		{
 			Name:        "help",
 			Description: "Displays information about the bot and its commands.",
+		},
+		{
+			Name:        "personal_best",
+			Description: "Displays the personal best for a player on the current map.",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "nick",
+					Description: "The player's nickname.",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "personal_total_runs",
+			Description: "Displays the total amount of runs for a player on the current map.",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "nick",
+					Description: "The player's nickname.",
+					Required:    true,
+				},
+			},
 		},
 	}
 }
@@ -67,6 +95,11 @@ func New(cfg *config.Config) (*Bot, error) {
 		return nil, err
 	}
 
+	db, err := sql.Open("sqlite3", cfg.DBPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
 	playerCounterService := automation.NewPlayerCounter(dg, cfg)
 	autoBanService := automation.NewAutoBan(cfg)
 	linkFixerService, err := automation.NewLinkFixer()
@@ -74,14 +107,17 @@ func New(cfg *config.Config) (*Bot, error) {
 		return nil, fmt.Errorf("failed to create LinkFixer service: %w", err)
 	}
 	tempMessengerService := automation.NewTempMessenger()
+	leaderboardService := automation.NewLeaderboardUpdater(dg, db, cfg)
 
 	return &Bot{
 		Session:       dg,
 		Config:        cfg,
+		DB:            db,
 		AutoBan:       autoBanService,
 		LinkFixer:     linkFixerService,
 		PlayerCounter: playerCounterService,
 		TempMessenger: tempMessengerService,
+		Leaderboarder: leaderboardService,
 	}, nil
 }
 
@@ -172,6 +208,7 @@ func (b *Bot) Run() {
 	<-sc
 
 	log.Println("[DISCORD] Shutting down bot...")
+	b.DB.Close()
 	b.Session.Close()
 }
 
@@ -182,6 +219,7 @@ func (b *Bot) ready(s *discordgo.Session, event *discordgo.Ready) {
 	s.UpdateGameStatus(0, "Managing Movement HUB")
 	b.syncAndCleanCommands()
 	b.PlayerCounter.Start()
+	b.Leaderboarder.Start()
 	log.Println("[DISCORD] Bot is ready!")
 }
 
@@ -192,6 +230,10 @@ func (b *Bot) interactionCreate(s *discordgo.Session, i *discordgo.InteractionCr
 	switch i.ApplicationCommandData().Name {
 	case "help":
 		b.handleHelpCommand(s, i)
+	case "personal_best":
+		b.handlePersonalBestCommand(s, i)
+	case "personal_total_runs":
+		b.handlePersonalTotalRunsCommand(s, i)
 	}
 }
 
@@ -209,4 +251,84 @@ func (b *Bot) handleHelpCommand(s *discordgo.Session, i *discordgo.InteractionCr
 	}
 }
 
-// TODO: CHECK IF UPDATED COMMAND MMESSAGE IS STILL SHOWING UP AND MAKE LEADERBOARD AUTOMATION WORK
+func (b *Bot) handlePersonalBestCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	mapName, ok := b.Config.MapChannels[i.ChannelID]
+	if !ok {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "This command can only be used in a designated map channel.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send ephemeral message for wrong channel: %v", err)
+		}
+		return
+	}
+
+	options := i.ApplicationCommandData().Options
+	nick := options[0].StringValue()
+
+	entry, err := b.Leaderboarder.GetPlayerBest(mapName, nick)
+	if err != nil {
+		log.Printf("[DISCORD] Error fetching personal best for %s on map %s: %v", nick, mapName, err)
+		// You might want to send an ephemeral error message to the user here as well
+		return
+	}
+
+	var content string
+	if entry == nil {
+		content = fmt.Sprintf("No records found for player **%s** on map **%s**.", nick, mapName)
+	} else {
+		content = fmt.Sprintf("The personal best for **%s** on **%s** is: **%s**", entry.PlayerName, mapName, entry.BestTime)
+	}
+
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to respond to personal_best command: %v", err)
+	}
+}
+
+func (b *Bot) handlePersonalTotalRunsCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	mapName, ok := b.Config.MapChannels[i.ChannelID]
+	if !ok {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "This command can only be used in a designated map channel.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send ephemeral message for wrong channel: %v", err)
+		}
+		return
+	}
+
+	options := i.ApplicationCommandData().Options
+	nick := options[0].StringValue()
+
+	totalRuns, err := b.Leaderboarder.GetPlayerTotalRuns(mapName, nick)
+	if err != nil {
+		log.Printf("[DISCORD] Error fetching total runs for %s on map %s: %v", nick, mapName, err)
+		return
+	}
+
+	content := fmt.Sprintf("Player **%s** has a total of **%d** runs on map **%s**.", nick, totalRuns, mapName)
+
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to respond to personal_total_runs command: %v", err)
+	}
+}

@@ -16,13 +16,9 @@ type Config struct {
 	PlayerCountFile       string
 	UpdateInterval        time.Duration
 	LeaderboardsChannelID string
-	FirstMapMessageID     string
-	GymMapMessageID       string
-	IthurtsMapMessageID   string
-	StrafeitMapMessageID  string
-	DoorMapMessageID      string
 	DBPath                string
 	AllowedMaps           map[string]string
+	MapChannels           map[string]string
 }
 
 func NewConfig() *Config {
@@ -33,7 +29,7 @@ func NewConfig() *Config {
 	updateIntervalStr := os.Getenv("UPDATE_INTERVAL")
 	updateInterval, err := time.ParseDuration(updateIntervalStr)
 	if err != nil || updateIntervalStr == "" {
-		updateInterval = 2 * time.Minute // Default to 5 minutes if not set or invalid.
+		updateInterval = 2 * time.Minute // Default to 2 minutes if not set or invalid.
 	}
 
 	allowedMaps := make(map[string]string)
@@ -46,6 +42,16 @@ func NewConfig() *Config {
 		allowedMaps[parts[0]] = parts[1]
 	}
 
+	mapChannels := make(map[string]string)
+	mapChannelsEnv := os.Getenv("MAP_CHANNELS")
+	for _, pair := range strings.Split(mapChannelsEnv, ",") {
+		parts := strings.Split(pair, ":")
+		if len(parts) != 2 {
+			continue
+		}
+		mapChannels[parts[0]] = parts[1] // map[channelID] = mapName
+	}
+
 	return &Config{
 		DiscordBotToken:       os.Getenv("DISCORD_BOT_TOKEN"),
 		DiscordGuildID:        os.Getenv("DISCORD_GUILD_ID"),
@@ -54,12 +60,8 @@ func NewConfig() *Config {
 		PlayerCountFile:       os.Getenv("PLAYER_COUNT_FILE"),
 		UpdateInterval:        updateInterval,
 		LeaderboardsChannelID: os.Getenv("LEADERBOARDS_CHANNEL_ID"),
-		FirstMapMessageID:     os.Getenv("FIRST_MAP_MESSAGE_ID"),
-		GymMapMessageID:       os.Getenv("GYM_MAP_MESSAGE_ID"),
-		IthurtsMapMessageID:   os.Getenv("ITHURTS_MAP_MESSAGE_ID"),
-		StrafeitMapMessageID:  os.Getenv("STRAFEIT_MAP_MESSAGE_ID"),
-		DoorMapMessageID:      os.Getenv("DOOR_MAP_MESSAGE_ID"),
 		DBPath:                os.Getenv("DB_PATH"),
 		AllowedMaps:           allowedMaps,
+		MapChannels:           mapChannels,
 	}
 }
