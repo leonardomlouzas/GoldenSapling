@@ -42,16 +42,6 @@ func NewConfig() *Config {
 		allowedMaps[parts[0]] = parts[1]
 	}
 
-	mapChannels := make(map[string]string)
-	mapChannelsEnv := os.Getenv("MAP_CHANNELS")
-	for _, pair := range strings.Split(mapChannelsEnv, ",") {
-		parts := strings.Split(pair, ":")
-		if len(parts) != 2 {
-			continue
-		}
-		mapChannels[parts[0]] = parts[1] // map[channelID] = mapName
-	}
-
 	return &Config{
 		DiscordBotToken:       os.Getenv("DISCORD_BOT_TOKEN"),
 		DiscordGuildID:        os.Getenv("DISCORD_GUILD_ID"),
@@ -62,6 +52,5 @@ func NewConfig() *Config {
 		LeaderboardsChannelID: os.Getenv("LEADERBOARDS_CHANNEL_ID"),
 		DBPath:                os.Getenv("DB_PATH"),
 		AllowedMaps:           allowedMaps,
-		MapChannels:           mapChannels,
 	}
 }

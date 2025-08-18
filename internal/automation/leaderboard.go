@@ -57,8 +57,26 @@ func (lb *Leaderboard) updateLeaderboards() {
 			log.Printf("[DISCORD] Failed to fetch %s leaderboard message: %v", mapName, err)
 			continue
 		}
-		rows := lb.leaderboardReader(mapName)
+		rows := helpers.LeaderboardReader(lb.db, mapName, lb.allowedMaps)
 		newMessage := helpers.TableConstructor(mapName, rows)
+
+		switch mapName {
+		case "firstmap":
+			newMessage += "\nhttps://discord.com/channels/839992880293478400/1100536422450073690"
+		case "gymmap":
+			newMessage += "\nhttps://discord.com/channels/839992880293478400/1180733536676880396"
+		case "ithurtsmap":
+			newMessage += "\nhttps://discord.com/channels/839992880293478400/1235449388147544074"
+		case "strafeitmap":
+			newMessage += "\nhttps://discord.com/channels/839992880293478400/1324802169878085702"
+		case "mantlejumpmap":
+			newMessage += "\nhttps://discord.com/channels/839992880293478400/1123705203015827597"
+		case "doorbouncemap":
+			newMessage += "\nhttps://discord.com/channels/839992880293478400/1100538367667613717"
+		default:
+			newMessage += "* No link available for this map yet"
+		}
+
 		if oldMessage.Content == newMessage {
 			continue
 		} else {
@@ -71,43 +89,13 @@ func (lb *Leaderboard) updateLeaderboards() {
 	}
 }
 
-func (lb *Leaderboard) leaderboardReader(mapName string) []helpers.LeaderboardEntry {
-	query := fmt.Sprintf(`
-		SELECT player_name, MIN(time_score) as best_time
-		FROM
-		(
-			SELECT MAX(id) as id, player_name, time_score
-			FROM "%s"
-			GROUP BY player_name, time_score
-		)
-		GROUP BY player_name
-		ORDER BY best_time ASC, id DESC
-		LIMIT 10;
-		`, mapName)
-	rows, err := lb.db.Query(query)
-	if err != nil {
-		log.Printf("[DISCORD] Failed to execute query while retrieving Leaderboard: %v", err)
-		return nil
-	}
-	defer rows.Close()
-
-	var entries []helpers.LeaderboardEntry
-	rank := 1
-	for rows.Next() {
-		var entry helpers.LeaderboardEntry
-		if err := rows.Scan(&entry.PlayerName, &entry.BestTime); err != nil {
-			log.Printf("[DISCORD] Failed to scan row while retrieving Leaderboard: %v", err)
-			continue
-		}
-		entry.Rank = rank
-		entries = append(entries, entry)
-		rank++
-	}
-	return entries
-}
-
 // GetPlayerBest retrieves the best time for a specific player on a specific map.
 func (lb *Leaderboard) GetPlayerBest(mapName, playerName string) (*helpers.LeaderboardEntry, error) {
+	if !helpers.IsValidTable(mapName, lb.allowedMaps) {
+		log.Printf("[SECURITY] Attempted to query an invalid table name in GetPlayerBest: %s", mapName)
+		return nil, fmt.Errorf("invalid map name provided")
+	}
+
 	query := fmt.Sprintf(`
 		SELECT player_name, MIN(time_score) as best_time
 		FROM "%s"
@@ -129,6 +117,11 @@ func (lb *Leaderboard) GetPlayerBest(mapName, playerName string) (*helpers.Leade
 
 // GetPlayerTotalRuns retrieves the total number of runs for a specific player on a specific map.
 func (lb *Leaderboard) GetPlayerTotalRuns(mapName, playerName string) (int, error) {
+	if !helpers.IsValidTable(mapName, lb.allowedMaps) {
+		log.Printf("[SECURITY] Attempted to query an invalid table name in GetPlayerTotalRuns: %s", mapName)
+		return 0, fmt.Errorf("invalid map name provided")
+	}
+
 	query := fmt.Sprintf(`SELECT COUNT(*) FROM "%s" WHERE player_name = ?;`, mapName)
 	row := lb.db.QueryRow(query, playerName)
 

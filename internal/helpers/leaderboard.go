@@ -1,14 +1,58 @@
 package helpers
 
 import (
+	"database/sql"
 	"fmt"
+	"log"
 	"strings"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type LeaderboardEntry struct {
 	Rank       int
 	PlayerName string
 	BestTime   int
+}
+
+func LeaderboardReader(db *sql.DB, mapName string, allowedMaps map[string]string) []LeaderboardEntry {
+	if !IsValidTable(mapName, allowedMaps) {
+		log.Printf("[SECURITY] Attempted to query an invalid table name: %s", mapName)
+		return nil
+	}
+
+	query := fmt.Sprintf(`
+		SELECT player_name, MIN(time_score) as best_time
+		FROM
+		(
+			SELECT MAX(id) as id, player_name, time_score
+			FROM "%s"
+			GROUP BY player_name, time_score
+		)
+		GROUP BY player_name
+		ORDER BY best_time ASC, id DESC
+		LIMIT 10;
+		`, mapName)
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Printf("[DISCORD] Failed to execute query while retrieving Leaderboard: %v", err)
+		return nil
+	}
+	defer rows.Close()
+
+	var entries []LeaderboardEntry
+	rank := 1
+	for rows.Next() {
+		var entry LeaderboardEntry
+		if err := rows.Scan(&entry.PlayerName, &entry.BestTime); err != nil {
+			log.Printf("[DISCORD] Failed to scan row while retrieving Leaderboard: %v", err)
+			continue
+		}
+		entry.Rank = rank
+		entries = append(entries, entry)
+		rank++
+	}
+	return entries
 }
 
 func TableConstructor(tableName string, entries []LeaderboardEntry) string {

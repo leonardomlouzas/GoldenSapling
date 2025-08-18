@@ -8,12 +8,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/leonardomlouzas/GoldenSapling/internal/automation"
 	"github.com/leonardomlouzas/GoldenSapling/internal/commands"
 	"github.com/leonardomlouzas/GoldenSapling/internal/config"
+	"github.com/leonardomlouzas/GoldenSapling/internal/helpers"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -35,8 +37,12 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			Description: "Displays information about the bot and its commands.",
 		},
 		{
+			Name:        "leaderboard",
+			Description: "Displays the leaderboard for the current map post.",
+		},
+		{
 			Name:        "personal_best",
-			Description: "Displays the personal best for a player on the current map.",
+			Description: "Displays the personal best for a player on the current map post.",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -100,14 +106,14 @@ func New(cfg *config.Config) (*Bot, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	playerCounterService := automation.NewPlayerCounter(dg, cfg)
 	autoBanService := automation.NewAutoBan(cfg)
+	tempMessengerService := automation.NewTempMessenger()
+	playerCounterService := automation.NewPlayerCounter(dg, cfg)
+	leaderboardService := automation.NewLeaderboardUpdater(dg, db, cfg)
 	linkFixerService, err := automation.NewLinkFixer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LinkFixer service: %w", err)
 	}
-	tempMessengerService := automation.NewTempMessenger()
-	leaderboardService := automation.NewLeaderboardUpdater(dg, db, cfg)
 
 	return &Bot{
 		Session:       dg,
@@ -230,6 +236,8 @@ func (b *Bot) interactionCreate(s *discordgo.Session, i *discordgo.InteractionCr
 	switch i.ApplicationCommandData().Name {
 	case "help":
 		b.handleHelpCommand(s, i)
+	case "leaderboard":
+		b.handleLeaderboardCommand(s, i)
 	case "personal_best":
 		b.handlePersonalBestCommand(s, i)
 	case "personal_total_runs":
@@ -251,13 +259,49 @@ func (b *Bot) handleHelpCommand(s *discordgo.Session, i *discordgo.InteractionCr
 	}
 }
 
+func (b *Bot) handleLeaderboardCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	channel, err := s.Channel(i.ChannelID)
+	if err != nil {
+		log.Printf("[DISCORD] Failed to get channel: %v", err)
+		return
+	}
+	mapName := channel.Name
+	mapName = strings.ToLower(mapName)
+	mapName = strings.ReplaceAll(mapName, " ", "")
+	if !helpers.IsValidTable(mapName, b.Config.AllowedMaps) {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "This command can only be used in movement map channels.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send ephemeral message for wrong channel: %v", err)
+		}
+		return
+	}
+
+	content := commands.LeaderboardByMapName(b.DB, mapName, b.Config.AllowedMaps)
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to respond to leaderboard command: %v", err)
+		return
+	}
+}
+
 func (b *Bot) handlePersonalBestCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	mapName, ok := b.Config.MapChannels[i.ChannelID]
 	if !ok {
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "This command can only be used in a designated map channel.",
+				Content: "This command can only be used in movement map channels.",
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
