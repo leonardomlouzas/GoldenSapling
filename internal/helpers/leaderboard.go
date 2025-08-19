@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/leonardomlouzas/GoldenSapling/internal/config"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -15,7 +16,7 @@ type LeaderboardEntry struct {
 	BestTime   int
 }
 
-func LeaderboardReader(db *sql.DB, mapName string, allowedMaps map[string]string) []LeaderboardEntry {
+func LeaderboardReader(db *sql.DB, mapName string, allowedMaps []config.MapInfo) []LeaderboardEntry {
 	if !IsValidTable(mapName, allowedMaps) {
 		log.Printf("[SECURITY] Attempted to query an invalid table name: %s", mapName)
 		return nil

@@ -238,10 +238,6 @@ func (b *Bot) interactionCreate(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleHelpCommand(s, i)
 	case "leaderboard":
 		b.handleLeaderboardCommand(s, i)
-	case "personal_best":
-		b.handlePersonalBestCommand(s, i)
-	case "personal_total_runs":
-		b.handlePersonalTotalRunsCommand(s, i)
 	}
 }
 
@@ -292,87 +288,5 @@ func (b *Bot) handleLeaderboardCommand(s *discordgo.Session, i *discordgo.Intera
 	if err != nil {
 		log.Printf("[DISCORD] Failed to respond to leaderboard command: %v", err)
 		return
-	}
-}
-
-func (b *Bot) handlePersonalBestCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	mapName, ok := b.Config.MapChannels[i.ChannelID]
-	if !ok {
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "This command can only be used in movement map channels.",
-				Flags:   discordgo.MessageFlagsEphemeral,
-			},
-		})
-		if err != nil {
-			log.Printf("[DISCORD] Failed to send ephemeral message for wrong channel: %v", err)
-		}
-		return
-	}
-
-	options := i.ApplicationCommandData().Options
-	nick := options[0].StringValue()
-
-	entry, err := b.Leaderboarder.GetPlayerBest(mapName, nick)
-	if err != nil {
-		log.Printf("[DISCORD] Error fetching personal best for %s on map %s: %v", nick, mapName, err)
-		// You might want to send an ephemeral error message to the user here as well
-		return
-	}
-
-	var content string
-	if entry == nil {
-		content = fmt.Sprintf("No records found for player **%s** on map **%s**.", nick, mapName)
-	} else {
-		content = fmt.Sprintf("The personal best for **%s** on **%s** is: **%s**", entry.PlayerName, mapName, entry.BestTime)
-	}
-
-	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: content,
-		},
-	})
-	if err != nil {
-		log.Printf("[DISCORD] Failed to respond to personal_best command: %v", err)
-	}
-}
-
-func (b *Bot) handlePersonalTotalRunsCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	mapName, ok := b.Config.MapChannels[i.ChannelID]
-	if !ok {
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "This command can only be used in a designated map channel.",
-				Flags:   discordgo.MessageFlagsEphemeral,
-			},
-		})
-		if err != nil {
-			log.Printf("[DISCORD] Failed to send ephemeral message for wrong channel: %v", err)
-		}
-		return
-	}
-
-	options := i.ApplicationCommandData().Options
-	nick := options[0].StringValue()
-
-	totalRuns, err := b.Leaderboarder.GetPlayerTotalRuns(mapName, nick)
-	if err != nil {
-		log.Printf("[DISCORD] Error fetching total runs for %s on map %s: %v", nick, mapName, err)
-		return
-	}
-
-	content := fmt.Sprintf("Player **%s** has a total of **%d** runs on map **%s**.", nick, totalRuns, mapName)
-
-	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: content,
-		},
-	})
-	if err != nil {
-		log.Printf("[DISCORD] Failed to respond to personal_total_runs command: %v", err)
 	}
 }

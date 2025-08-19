@@ -8,6 +8,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type MapInfo struct {
+	MessageID string // ID of the map message used in the leaderboard channel
+	MapName   string // Name of the map, used for validation
+	ChannelID string // ID of the channel where the map is discussed
+}
+
 type Config struct {
 	DiscordBotToken       string
 	DiscordGuildID        string
@@ -17,8 +23,7 @@ type Config struct {
 	UpdateInterval        time.Duration
 	LeaderboardsChannelID string
 	DBPath                string
-	AllowedMaps           map[string]string
-	MapChannels           map[string]string
+	AllowedMaps           []MapInfo
 }
 
 func NewConfig() *Config {
@@ -32,14 +37,18 @@ func NewConfig() *Config {
 		updateInterval = 2 * time.Minute // Default to 2 minutes if not set or invalid.
 	}
 
-	allowedMaps := make(map[string]string)
+	var allowedMaps []MapInfo
 	allowedMapsEnv := os.Getenv("ALLOWED_MAPS")
-	for _, pair := range strings.Split(allowedMapsEnv, ",") {
-		parts := strings.Split(pair, ":")
-		if len(parts) != 2 {
-			continue
+	for _, mapInfo := range strings.Split(allowedMapsEnv, ",") {
+		parts := strings.Split(mapInfo, ":")
+		// Expects format map_name:message_id:channel_id
+		if len(parts) > 2 {
+			allowedMaps = append(allowedMaps, MapInfo{
+				MapName:   parts[0],
+				MessageID: parts[1],
+				ChannelID: parts[2],
+			})
 		}
-		allowedMaps[parts[0]] = parts[1]
 	}
 
 	return &Config{
