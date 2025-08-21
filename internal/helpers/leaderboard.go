@@ -96,7 +96,7 @@ func TableConstructor(tableName string, entries []LeaderboardEntry) string {
 		}
 		entry.PlayerName = fmt.Sprintf("%-20s", entry.PlayerName)
 
-		line := fmt.Sprintf(" %3d  %s %10d ", entry.Rank, entry.PlayerName, entry.BestTime)
+		line := fmt.Sprintf(" %3d  %s %10s ", entry.Rank, entry.PlayerName, ConvertSecondsToTimer(entry.BestTime))
 		if len(line) > maxLineLength {
 			line = line[:maxLineLength]
 		} else if len(line) < maxLineLength {

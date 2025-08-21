@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
@@ -41,8 +40,8 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			Description: "Displays the leaderboard for the current map post.",
 		},
 		{
-			Name:        "personal_best",
-			Description: "Displays the personal best for a player on the current map post.",
+			Name:        "player_info",
+			Description: "Displays player information for the current map post.",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -238,6 +237,8 @@ func (b *Bot) interactionCreate(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleHelpCommand(s, i)
 	case "leaderboard":
 		b.handleLeaderboardCommand(s, i)
+	case "player_info":
+		b.handlePlayerInfoCommand(s, i)
 	}
 }
 
@@ -262,8 +263,7 @@ func (b *Bot) handleLeaderboardCommand(s *discordgo.Session, i *discordgo.Intera
 		return
 	}
 	mapName := channel.Name
-	mapName = strings.ToLower(mapName)
-	mapName = strings.ReplaceAll(mapName, " ", "")
+	mapName = helpers.MapNameNormalizer(mapName)
 	if !helpers.IsValidTable(mapName, b.Config.AllowedMaps) {
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -287,6 +287,43 @@ func (b *Bot) handleLeaderboardCommand(s *discordgo.Session, i *discordgo.Intera
 	})
 	if err != nil {
 		log.Printf("[DISCORD] Failed to respond to leaderboard command: %v", err)
+		return
+	}
+}
+
+func (b *Bot) handlePlayerInfoCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	playerName := i.ApplicationCommandData().Options[0].StringValue()
+	channel, err := s.Channel(i.ChannelID)
+	if err != nil {
+		log.Printf("[DISCORD] Failed to get channel while handling PlayerInfoCommand: %v", err)
+		return
+	}
+
+	mapName := channel.Name
+	mapName = helpers.MapNameNormalizer(mapName)
+	if !helpers.IsValidTable(mapName, b.Config.AllowedMaps) {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "This command can only be used in movement map channels.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send ephemeral message for wrong channel while handling PlayerInfoCommand: %v", err)
+		}
+		return
+	}
+
+	embed := commands.PlayerInfo(b.DB, playerName, mapName, b.Config.AllowedMaps)
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to respond to PlayerInfoCommand: %v", err)
 		return
 	}
 }
