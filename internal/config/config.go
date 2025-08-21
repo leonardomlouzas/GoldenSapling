@@ -24,6 +24,8 @@ type Config struct {
 	LeaderboardsChannelID string
 	DBPath                string
 	AllowedMaps           []MapInfo
+	NewRunsChannelID      string
+	NewRunsPath           string
 }
 
 func NewConfig() *Config {
@@ -61,5 +63,7 @@ func NewConfig() *Config {
 		LeaderboardsChannelID: os.Getenv("LEADERBOARDS_CHANNEL_ID"),
 		DBPath:                os.Getenv("DB_PATH"),
 		AllowedMaps:           allowedMaps,
+		NewRunsChannelID:      os.Getenv("NEW_RUNS_CHANNEL_ID"),
+		NewRunsPath:           os.Getenv("NEW_RUNS_PATH"),
 	}
 }
