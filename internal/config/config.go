@@ -26,6 +26,7 @@ type Config struct {
 	AllowedMaps           []MapInfo
 	NewRunsChannelID      string
 	NewRunsPath           string
+	Top10FilePath         string
 }
 
 func NewConfig() *Config {
@@ -65,5 +66,6 @@ func NewConfig() *Config {
 		AllowedMaps:           allowedMaps,
 		NewRunsChannelID:      os.Getenv("NEW_RUNS_CHANNEL_ID"),
 		NewRunsPath:           os.Getenv("NEW_RUNS_PATH"),
+		Top10FilePath:         os.Getenv("TOP_10_FILE_PATH"),
 	}
 }

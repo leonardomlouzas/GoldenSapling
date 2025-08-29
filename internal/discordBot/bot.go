@@ -27,6 +27,7 @@ type Bot struct {
 	TempMessenger *automation.TempMessenger
 	Leaderboarder *automation.Leaderboard
 	NewRunners    *automation.NewRunners
+	FileUpdater   *automation.FileUpdater
 	DB            *sql.DB
 }
 
@@ -110,7 +111,8 @@ func New(cfg *config.Config) (*Bot, error) {
 	tempMessengerService := automation.NewTempMessenger()
 	playerCounterService := automation.NewPlayerCounter(dg, cfg)
 	leaderboardService := automation.NewLeaderboardUpdater(dg, db, cfg)
-	newRunsSevice := automation.NewRunnersService(dg, cfg)
+	newRunsSevice := automation.NewRunnersService(dg, db, cfg)
+	fileUpdaterService := automation.NewFileUpdater(dg, db, cfg)
 	linkFixerService, err := automation.NewLinkFixer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LinkFixer service: %w", err)
@@ -126,6 +128,7 @@ func New(cfg *config.Config) (*Bot, error) {
 		TempMessenger: tempMessengerService,
 		Leaderboarder: leaderboardService,
 		NewRunners:    newRunsSevice,
+		FileUpdater:   fileUpdaterService,
 	}, nil
 }
 
@@ -229,6 +232,7 @@ func (b *Bot) ready(s *discordgo.Session, event *discordgo.Ready) {
 	b.PlayerCounter.Start()
 	b.Leaderboarder.Start()
 	b.NewRunners.Start()
+	b.FileUpdater.Start()
 	log.Println("[DISCORD] Bot is ready!")
 }
 

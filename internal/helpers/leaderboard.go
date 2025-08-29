@@ -63,10 +63,11 @@ func TableConstructor(tableName string, entries []LeaderboardEntry) string {
 	const maxLineLength = 38
 	const usernameMaxLength = 20
 
-	tableTitle := strings.ToUpper(tableName) + " LEADERBOARD"
+	tableTitle := tableName + " LEADERBOARD"
 	if len(tableTitle) > maxLineLength {
-		tableTitle = strings.ToUpper(tableName[:26]) + " LEADERBOARD"
+		tableTitle = tableName[:26] + " LEADERBOARD"
 	}
+	tableTitle = strings.ToUpper(tableTitle)
 	padding := int((maxLineLength - len(tableTitle)) / 2)
 	titleStyleStart := `[1;2m[1;37m[1;45m`
 	titleStyleEnd := `[0m[1;37m[0m[0m`

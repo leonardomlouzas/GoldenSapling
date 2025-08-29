@@ -1,8 +1,11 @@
 package automation
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -15,9 +18,10 @@ type NewRunners struct {
 	session        *discordgo.Session
 	channelID      string
 	folderPath     string
+	db             *sql.DB
 }
 
-func NewRunnersService(s *discordgo.Session, cfg *config.Config) *NewRunners {
+func NewRunnersService(s *discordgo.Session, db *sql.DB, cfg *config.Config) *NewRunners {
 	if cfg.NewRunsChannelID == "" {
 		log.Println("[DISCORD] NEW_RUNNERS_CHANNEL_ID not set, 'New Runners' feature disabled")
 		return nil
@@ -27,6 +31,7 @@ func NewRunnersService(s *discordgo.Session, cfg *config.Config) *NewRunners {
 		channelID:      cfg.NewRunsChannelID,
 		updateInterval: cfg.UpdateInterval,
 		folderPath:     cfg.NewRunsPath,
+		db:             db,
 	}
 }
 
@@ -72,6 +77,21 @@ func (sc *NewRunners) updateNewRunners() {
 
 		entry := helpers.NewRunReader(content)
 		entries[entry.MapName] = append(entries[entry.MapName], entry)
+
+		// DB INSERT
+		timeInt, err := strconv.Atoi(entry.TimeScore)
+		if err != nil {
+			log.Printf("[DISCORD] Invalid time score for %s: %v", entry.PlayerName, err)
+		} else {
+			_, err = sc.db.Exec(
+				fmt.Sprintf(`INSERT INTO "%s" (player_name, time_score) VALUES (?, ?)`, entry.MapName),
+				entry.PlayerName, timeInt,
+			)
+			if err != nil {
+				log.Printf("[DISCORD] Failed to insert new run for %s (%s) in %s: %v", entry.PlayerName, entry.TimeScore, entry.MapName, err)
+			}
+		}
+		//
 
 		err = os.Remove(filePath)
 		if err != nil {
