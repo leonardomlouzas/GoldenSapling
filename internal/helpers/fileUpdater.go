@@ -121,7 +121,6 @@ func retrieveTop3(db *sql.DB, allowedMaps []config.MapInfo) map[string][]Leaderb
 		rows.Close()
 		top3Players[mapInfo.MapName] = players
 	}
-	fmt.Println(top3Players)
 	return top3Players
 }
 
@@ -162,6 +161,5 @@ func retrieveTop10(db *sql.DB, allowedMaps []config.MapInfo) map[string][]Leader
 		rows.Close()
 		top10Players[mapInfo.MapName] = players
 	}
-	fmt.Println(top10Players)
 	return top10Players
 }

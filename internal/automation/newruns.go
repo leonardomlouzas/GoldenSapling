@@ -74,6 +74,9 @@ func (sc *NewRunners) updateNewRunners() {
 			log.Printf("[DISCORD] Failed to read file %s while in updateNewRunners: %v", file.Name(), err)
 			continue
 		}
+		if len(content) == 0 {
+			continue
+		}
 
 		entry := helpers.NewRunReader(content)
 		entries[entry.MapName] = append(entries[entry.MapName], entry)

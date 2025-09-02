@@ -27,6 +27,7 @@ type Config struct {
 	NewRunsChannelID      string
 	NewRunsPath           string
 	Top10FilePath         string
+	AdminIDs              []string
 }
 
 func NewConfig() *Config {
@@ -54,6 +55,9 @@ func NewConfig() *Config {
 		}
 	}
 
+	adminsEnv := os.Getenv("ADMIN_IDS")
+	admins := strings.Split(adminsEnv, ",")
+
 	return &Config{
 		DiscordBotToken:       os.Getenv("DISCORD_BOT_TOKEN"),
 		DiscordGuildID:        os.Getenv("DISCORD_GUILD_ID"),
@@ -67,5 +71,6 @@ func NewConfig() *Config {
 		NewRunsChannelID:      os.Getenv("NEW_RUNS_CHANNEL_ID"),
 		NewRunsPath:           os.Getenv("NEW_RUNS_PATH"),
 		Top10FilePath:         os.Getenv("TOP_10_FILE_PATH"),
+		AdminIDs:              admins,
 	}
 }

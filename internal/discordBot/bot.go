@@ -48,7 +48,73 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "nick",
-					Description: "The player's nickname.",
+					Description: "The player nickname.",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "add",
+			Description: "[ADMIN ONLY] Manually add a new run",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "nick",
+					Description: "The player nickname (case sensitive)",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "timer",
+					Description: "The player run timer (00:00)",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "map_name",
+					Description: "The player run map",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "remove",
+			Description: "[ADMIN ONLY] Manually remove a specific run or all runs from a player",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "map_name",
+					Description: "The player run map ('all' for every map)",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "nick",
+					Description: "The player nickname (case sensitive)",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "timer",
+					Description: "The player run timer (00:00)",
+					Required:    false,
+				},
+			},
+		},
+		{
+			Name:        "rename",
+			Description: "[ADMIN ONLY] Rename a player nickname to a new one",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "old_nick",
+					Description: "The old player nickname (case sensitive)",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "new_nick",
+					Description: "The new player nickname (case sensitive)",
 					Required:    true,
 				},
 			},
@@ -247,6 +313,12 @@ func (b *Bot) interactionCreate(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleLeaderboardCommand(s, i)
 	case "player_info":
 		b.handlePlayerInfoCommand(s, i)
+	case "add":
+		b.handleAddCommand(s, i)
+	case "remove":
+		b.handleRemoveCommand(s, i)
+	case "rename":
+		b.handleRenameCommand(s, i)
 	}
 }
 
@@ -300,7 +372,14 @@ func (b *Bot) handleLeaderboardCommand(s *discordgo.Session, i *discordgo.Intera
 }
 
 func (b *Bot) handlePlayerInfoCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	playerName := i.ApplicationCommandData().Options[0].StringValue()
+	options := i.ApplicationCommandData().Options
+	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+	for _, opt := range options {
+		optionMap[opt.Name] = opt
+	}
+
+	playerName := optionMap["nick"].StringValue()
+
 	channel, err := s.Channel(i.ChannelID)
 	if err != nil {
 		log.Printf("[DISCORD] Failed to get channel while handling PlayerInfoCommand: %v", err)
@@ -333,5 +412,119 @@ func (b *Bot) handlePlayerInfoCommand(s *discordgo.Session, i *discordgo.Interac
 	if err != nil {
 		log.Printf("[DISCORD] Failed to respond to PlayerInfoCommand: %v", err)
 		return
+	}
+}
+
+func (b *Bot) handleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if !helpers.IsAdmin(i.Member.User.ID, b.Config.AdminIDs) {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Nice try, only admins can use this command.",
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send permission denied message: %v", err)
+		}
+		return
+	}
+
+	options := i.ApplicationCommandData().Options
+	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+	for _, opt := range options {
+		optionMap[opt.Name] = opt
+	}
+
+	playerName := optionMap["nick"].StringValue()
+	playerTimer := optionMap["timer"].StringValue()
+	mapName := optionMap["map_name"].StringValue()
+
+	content := commands.AddRun(b.DB, playerName, playerTimer, mapName, b.Config.AllowedMaps)
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{content},
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to add run: %v", err)
+	}
+}
+
+func (b *Bot) handleRemoveCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if !helpers.IsAdmin(i.Member.User.ID, b.Config.AdminIDs) {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Nice try, only admins can use this command.",
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send permission denied message: %v", err)
+		}
+		return
+	}
+
+	options := i.ApplicationCommandData().Options
+	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+	for _, opt := range options {
+		optionMap[opt.Name] = opt
+	}
+
+	playerName := optionMap["nick"].StringValue()
+	mapName := optionMap["map_name"].StringValue()
+
+	var playerTimer string
+	if opt, ok := optionMap["timer"]; ok {
+		playerTimer = opt.StringValue()
+	}
+
+	content := commands.RemoveRun(b.DB, playerName, playerTimer, mapName, b.Config.AllowedMaps)
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{content},
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to remove run(s): %v", err)
+	}
+}
+
+func (b *Bot) handleRenameCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if !helpers.IsAdmin(i.Member.User.ID, b.Config.AdminIDs) {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Nice try, only admins can use this command.",
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send permission denied message: %v", err)
+		}
+		return
+	}
+
+	options := i.ApplicationCommandData().Options
+	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+	for _, opt := range options {
+		optionMap[opt.Name] = opt
+	}
+
+	oldName := optionMap["old_nick"].StringValue()
+	newName := optionMap["new_nick"].StringValue()
+
+	content := commands.RenamePlayer(b.DB, oldName, newName, b.Config.AllowedMaps)
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{content},
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to remove run(s): %v", err)
 	}
 }
