@@ -15,7 +15,7 @@ func NewTempMessenger() *TempMessenger {
 	return &TempMessenger{}
 }
 
-// MessageCreateHandler checks for the `!temp` command and sends a message.
+// MessageCreateHandler checks for the `>temp` command and sends a message.
 func (tm *TempMessenger) MessageCreateHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot || m.Content != ">temp" {
 		return
