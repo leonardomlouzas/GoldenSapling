@@ -23,9 +23,9 @@ func PlayerInfo(db *sql.DB, playerName string, mapName string, allowedMaps []con
 		Description: fmt.Sprintf("%s statistics:", playerName),
 		Color:       0x00ff00,
 		Fields: []*discordgo.MessageEmbedField{
-			{Name: "Best Time", Value: entry.BestTime, Inline: true},
+			{Name: "Best Time", Value: fmt.Sprintf("%s (x%s)", entry.BestTime, entry.BestTimeAmount), Inline: true},
 			{Name: "Total Runs", Value: fmt.Sprint(entry.TotalRuns), Inline: true},
-			{Name: "Best Time Amount", Value: entry.BestTimeAmount, Inline: true},
+			{Name: "Worst Time", Value: entry.SlowestRun, Inline: true},
 			{Name: "Last Run", Value: entry.LastRun, Inline: true},
 			{Name: "First Run", Value: entry.FirstRun, Inline: true},
 			{Name: "Total Time", Value: entry.TotalTime, Inline: true},

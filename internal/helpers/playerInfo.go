@@ -15,6 +15,7 @@ type PlayerInfo struct {
 	FirstRun       string
 	TotalTime      string
 	BestTimeAmount string
+	SlowestRun     string
 }
 
 func PlayerInfoReader(db *sql.DB, playerName string, mapName string, allowedMaps []config.MapInfo) *PlayerInfo {
@@ -98,6 +99,20 @@ func PlayerInfoReader(db *sql.DB, playerName string, mapName string, allowedMaps
 	WHERE player_name = "%s" AND time_score = %d`, mapName, playerName, bestTime)
 	row = db.QueryRow(query)
 	err = row.Scan(&playerInfo.BestTimeAmount)
+
+	query = fmt.Sprintf(`
+	SELECT MAX(time_score)
+	FROM "%s"
+	WHERE player_name = "%s"`, mapName, playerName)
+
+	row = db.QueryRow(query)
+	var slowestTime int
+	err = row.Scan(&slowestTime)
+	if err != nil {
+		log.Printf("[DISCORD] Failed to retrieve best time for player %s on map %s: %v", playerName, mapName, err)
+		return nil
+	}
+	playerInfo.SlowestRun = ConvertSecondsToTimer(slowestTime)
 
 	return playerInfo
 
