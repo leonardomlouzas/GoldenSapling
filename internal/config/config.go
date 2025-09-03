@@ -19,7 +19,7 @@ type Config struct {
 	DiscordGuildID        string
 	BannedWords           string
 	PlayerCountChannelID  string
-	PlayerCountFile       string
+	R5RServerListURL      string
 	UpdateInterval        time.Duration
 	LeaderboardsChannelID string
 	DBPath                string
@@ -63,7 +63,7 @@ func NewConfig() *Config {
 		DiscordGuildID:        os.Getenv("DISCORD_GUILD_ID"),
 		BannedWords:           os.Getenv("BANNED_WORDS"),
 		PlayerCountChannelID:  os.Getenv("PLAYER_COUNT_CHANNEL_ID"),
-		PlayerCountFile:       os.Getenv("PLAYER_COUNT_FILE"),
+		R5RServerListURL:      os.Getenv("R5R_SERVER_LIST_URL"),
 		UpdateInterval:        updateInterval,
 		LeaderboardsChannelID: os.Getenv("LEADERBOARDS_CHANNEL_ID"),
 		DBPath:                os.Getenv("DB_PATH"),

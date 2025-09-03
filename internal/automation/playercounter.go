@@ -1,12 +1,12 @@
 package automation
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
-	"os"
+	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -14,11 +14,11 @@ import (
 )
 
 type PlayerCounter struct {
-	session         *discordgo.Session
-	channelID       string
-	lastKnownName   string
-	playerCountFile string
-	updateInterval  time.Duration
+	session        *discordgo.Session
+	channelID      string
+	lastKnownName  string
+	serverListURL  string
+	updateInterval time.Duration
 }
 
 /*
@@ -31,10 +31,10 @@ func NewPlayerCounter(s *discordgo.Session, cfg *config.Config) *PlayerCounter {
 		return nil
 	}
 	return &PlayerCounter{
-		session:         s,
-		channelID:       cfg.PlayerCountChannelID,
-		playerCountFile: cfg.PlayerCountFile,
-		updateInterval:  cfg.UpdateInterval,
+		session:        s,
+		channelID:      cfg.PlayerCountChannelID,
+		serverListURL:  cfg.R5RServerListURL,
+		updateInterval: cfg.UpdateInterval,
 	}
 }
 
@@ -63,26 +63,55 @@ func (pc *PlayerCounter) Start() {
 }
 
 func (pc *PlayerCounter) getPlayerCount() (int, error) {
-	file, err := os.Open(pc.playerCountFile)
+
+	req, err := http.NewRequest("POST", pc.serverListURL, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to open player count file: %w while 'Player Counter' execution", err)
+		return 0, fmt.Errorf("failed to create request: %w while 'Player Counter' execution", err)
 	}
-	defer file.Close()
+	req.Header.Set("User-Agent", "GoldenSaplingBotTreeree/1.0")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Accept-Encoding", "identity")
+	req.ContentLength = 0
 
-	scanner := bufio.NewScanner(file)
-	if scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) == 2 && strings.TrimSpace(parts[0]) == "players_online" {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("request failed: %w while 'Player Counter' execution", err)
+	}
+	defer resp.Body.Close()
 
-			amount, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-			if err != nil {
-				return 0, fmt.Errorf("failed to convert the player amount into a number while 'Player Counter' execution")
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("received non-200 response code: %d while 'Player Counter' execution", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read response body: %w while 'Player Counter' execution", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, fmt.Errorf("failed to parse JSON response: %w while 'Player Counter' execution", err)
+	}
+
+	servers := result["servers"].([]interface{})
+	for _, server := range servers {
+		srv := server.(map[string]interface{})
+		if srv["name"] == "[NA] MOVEMENT HUB" {
+			playerCountStr, ok := srv["playerCount"].(string)
+			if !ok {
+				return 0, fmt.Errorf("playerCount is not a string while 'Player Counter' execution")
 			}
-			return amount, nil
+			playersInt, err := strconv.Atoi(playerCountStr)
+			if err != nil {
+				return 0, fmt.Errorf("failed to convert player count to integer: %w while 'Player Counter' execution", err)
+			}
+			return playersInt, nil
 		}
 	}
-	return 0, fmt.Errorf("player_online string not found in file while 'Player Counter' execution")
+
+	return 0, fmt.Errorf("HUB server not found in the server list while 'Player Counter' execution")
 }
 
 /*
