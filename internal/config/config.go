@@ -27,6 +27,7 @@ type Config struct {
 	NewRunsChannelID      string
 	NewRunsPath           string
 	Top10FilePath         string
+	GamePath              string
 	AdminIDs              []string
 }
 
@@ -71,6 +72,7 @@ func NewConfig() *Config {
 		NewRunsChannelID:      os.Getenv("NEW_RUNS_CHANNEL_ID"),
 		NewRunsPath:           os.Getenv("NEW_RUNS_PATH"),
 		Top10FilePath:         os.Getenv("TOP_10_FILE_PATH"),
+		GamePath:              os.Getenv("GAME_PATH"),
 		AdminIDs:              admins,
 	}
 }

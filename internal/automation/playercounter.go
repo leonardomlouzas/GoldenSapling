@@ -11,6 +11,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/leonardomlouzas/GoldenSapling/internal/config"
+	"github.com/leonardomlouzas/GoldenSapling/internal/helpers"
 )
 
 type PlayerCounter struct {
@@ -18,6 +19,7 @@ type PlayerCounter struct {
 	channelID      string
 	lastKnownName  string
 	serverListURL  string
+	gamePath       string
 	updateInterval time.Duration
 }
 
@@ -35,6 +37,7 @@ func NewPlayerCounter(s *discordgo.Session, cfg *config.Config) *PlayerCounter {
 		channelID:      cfg.PlayerCountChannelID,
 		serverListURL:  cfg.R5RServerListURL,
 		updateInterval: cfg.UpdateInterval,
+		gamePath:       cfg.GamePath,
 	}
 }
 
@@ -111,6 +114,7 @@ func (pc *PlayerCounter) getPlayerCount() (int, error) {
 		}
 	}
 
+	helpers.RestartHUB(pc.gamePath, 1)
 	return 0, fmt.Errorf("HUB server not found in the server list while 'Player Counter' execution")
 }
 
