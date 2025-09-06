@@ -54,7 +54,19 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        "add",
+			Name:        "last_runs",
+			Description: "Displays the last 10 runs of a player on the current map.",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "nick",
+					Description: "The player nickname",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "zAdd",
 			Description: "[ADMIN ONLY] Manually add a new run",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -78,7 +90,7 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        "remove",
+			Name:        "zRemove",
 			Description: "[ADMIN ONLY] Manually remove a specific run or all runs from a player",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -102,7 +114,7 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        "rename",
+			Name:        "zRename",
 			Description: "[ADMIN ONLY] Rename a player nickname to a new one",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -115,18 +127,6 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "new_nick",
 					Description: "The new player nickname (case sensitive)",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "personal_total_runs",
-			Description: "Displays the total amount of runs for a player on the current map.",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "nick",
-					Description: "The player's nickname.",
 					Required:    true,
 				},
 			},
@@ -313,11 +313,13 @@ func (b *Bot) interactionCreate(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleLeaderboardCommand(s, i)
 	case "player_info":
 		b.handlePlayerInfoCommand(s, i)
-	case "add":
+	case "last_runs":
+		b.handleLastRunsCommand(s, i)
+	case "zadd":
 		b.handleAddCommand(s, i)
-	case "remove":
+	case "zremove":
 		b.handleRemoveCommand(s, i)
-	case "rename":
+	case "zrename":
 		b.handleRenameCommand(s, i)
 	}
 }
@@ -413,6 +415,49 @@ func (b *Bot) handlePlayerInfoCommand(s *discordgo.Session, i *discordgo.Interac
 		log.Printf("[DISCORD] Failed to respond to PlayerInfoCommand: %v", err)
 		return
 	}
+}
+func (b *Bot) handleLastRunsCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	options := i.ApplicationCommandData().Options
+	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+	for _, opt := range options {
+		optionMap[opt.Name] = opt
+	}
+
+	playerName := optionMap["nick"].StringValue()
+
+	channel, err := s.Channel(i.ChannelID)
+	if err != nil {
+		log.Printf("[DISCORD] Failed to get channel: %v", err)
+		return
+	}
+	mapName := channel.Name
+	mapName = helpers.MapNameNormalizer(mapName)
+	if !helpers.IsValidTable(mapName, b.Config.AllowedMaps) {
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "This command can only be used in movement map channels.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		if err != nil {
+			log.Printf("[DISCORD] Failed to send ephemeral message for wrong channel: %v", err)
+		}
+		return
+	}
+
+	content := commands.LastRuns(b.DB, playerName, mapName, b.Config.AllowedMaps)
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to respond to LastRun command: %v", err)
+		return
+	}
+
 }
 
 func (b *Bot) handleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {

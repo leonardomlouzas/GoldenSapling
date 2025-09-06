@@ -99,6 +99,10 @@ func PlayerInfoReader(db *sql.DB, playerName string, mapName string, allowedMaps
 	WHERE player_name = "%s" AND time_score = %d`, mapName, playerName, bestTime)
 	row = db.QueryRow(query)
 	err = row.Scan(&playerInfo.BestTimeAmount)
+	if err != nil {
+		log.Printf("[DISCORD] Failed to retrieve best time amount for player %s on map %s: %v", playerName, mapName, err)
+		return nil
+	}
 
 	query = fmt.Sprintf(`
 	SELECT MAX(time_score)

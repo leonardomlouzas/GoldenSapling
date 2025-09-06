@@ -114,8 +114,11 @@ func (pc *PlayerCounter) getPlayerCount() (int, error) {
 		}
 	}
 
-	helpers.RestartHUB(pc.gamePath, 1)
-	return 0, fmt.Errorf("HUB server not found in the server list while 'Player Counter' execution")
+	err = helpers.RestartHUB(pc.gamePath)
+	if err != nil {
+		return 0, fmt.Errorf("bot tried to restart HUB server but got: %s", err)
+	}
+	return 0, fmt.Errorf("bot restarted HUB successfully")
 }
 
 /*
@@ -125,7 +128,7 @@ func (pc *PlayerCounter) updateChannelName() {
 	var channelName string
 	count, err := pc.getPlayerCount()
 	if err != nil {
-		log.Printf("[DISCORD] Failed to get players count while 'Player Counter' execution: %v", err)
+		log.Printf("[DISCORD] Failed to get players count while 'Player Counter' execution... %v", err)
 		channelName = "HUB is offline"
 	} else {
 		channelName = fmt.Sprintf("Players online: %d", count)
