@@ -416,6 +416,7 @@ func (b *Bot) handlePlayerInfoCommand(s *discordgo.Session, i *discordgo.Interac
 		return
 	}
 }
+
 func (b *Bot) handleLastRunsCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	options := i.ApplicationCommandData().Options
 	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))

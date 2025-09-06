@@ -9,7 +9,7 @@ import (
 	"github.com/leonardomlouzas/GoldenSapling/internal/helpers"
 )
 
-func PlayerInfo(db *sql.DB, playerName string, mapName string, allowedMaps []config.MapInfo) *discordgo.MessageEmbed {
+func PlayerInfo(db *sql.DB, playerName, mapName string, allowedMaps []config.MapInfo) *discordgo.MessageEmbed {
 	entry := helpers.PlayerInfoReader(db, playerName, mapName, allowedMaps)
 	if entry == nil {
 		return &discordgo.MessageEmbed{

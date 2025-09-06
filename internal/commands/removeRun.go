@@ -9,7 +9,7 @@ import (
 	"github.com/leonardomlouzas/GoldenSapling/internal/helpers"
 )
 
-func RemoveRun(db *sql.DB, playerName string, timer, mapName string, allowedMaps []config.MapInfo) *discordgo.MessageEmbed {
+func RemoveRun(db *sql.DB, playerName, timer, mapName string, allowedMaps []config.MapInfo) *discordgo.MessageEmbed {
 	if !helpers.IsValidTable(mapName, allowedMaps) && mapName != "all" {
 		return &discordgo.MessageEmbed{
 			Title:       "FAILED",
