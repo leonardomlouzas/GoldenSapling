@@ -172,6 +172,7 @@ func New(cfg *config.Config) (*Bot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+	db.SetMaxOpenConns(1)
 
 	autoBanService := automation.NewAutoBan(cfg)
 	tempMessengerService := automation.NewTempMessenger()

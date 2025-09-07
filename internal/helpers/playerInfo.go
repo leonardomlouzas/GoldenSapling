@@ -24,100 +24,51 @@ func PlayerInfoReader(db *sql.DB, playerName string, mapName string, allowedMaps
 		return nil
 	}
 
-	playerInfo := &PlayerInfo{}
 	query := fmt.Sprintf(`
-	SELECT MIN(time_score)
-	FROM "%s"
-	WHERE player_name = "%s"`, mapName, playerName)
+		SELECT
+			MIN(time_score),
+			COUNT(time_score),
+			SUM(time_score),
+			MAX(time_score),
+			(SELECT time_score FROM "%s" WHERE player_name = ? ORDER BY id ASC LIMIT 1),
+			(SELECT time_score FROM "%s" WHERE player_name = ? ORDER BY id DESC LIMIT 1)
+		FROM "%s"
+		WHERE player_name = ?`, mapName, mapName, mapName)
 
-	row := db.QueryRow(query)
-	var bestTime int
-	err := row.Scan(&bestTime)
+	var bestTime, totalRuns, totalTime, slowestTime, firstRun, lastRun sql.NullInt64
+	err := db.QueryRow(query, playerName, playerName, playerName).Scan(
+		&bestTime,
+		&totalRuns,
+		&totalTime,
+		&slowestTime,
+		&firstRun,
+		&lastRun,
+	)
 	if err != nil {
-		log.Printf("[DISCORD] Failed to retrieve best time for player %s on map %s: %v", playerName, mapName, err)
-		return nil
-	}
-	playerInfo.BestTime = ConvertSecondsToTimer(bestTime)
-
-	query = fmt.Sprintf(`
-	SELECT COUNT(time_score)
-	FROM "%s"
-	WHERE player_name = "%s"`, mapName, playerName)
-	row = db.QueryRow(query)
-	err = row.Scan(&playerInfo.TotalRuns)
-	if err != nil {
-		log.Printf("[DISCORD] Failed to retrieve total runs for player %s on map %s: %v", playerName, mapName, err)
-		return nil
-	}
-
-	query = fmt.Sprintf(`
-	SELECT time_score
-	FROM "%s"
-	WHERE player_name = "%s"
-	ORDER BY id DESC
-	LIMIT 1`, mapName, playerName)
-	row = db.QueryRow(query)
-	var lastRun int
-	err = row.Scan(&lastRun)
-	if err != nil {
-		log.Printf("[DISCORD] Failed to retrieve last run for player %s on map %s: %v", playerName, mapName, err)
-		return nil
-	}
-	playerInfo.LastRun = ConvertSecondsToTimer(lastRun)
-
-	query = fmt.Sprintf(`
-	SELECT time_score
-	FROM "%s"
-	WHERE player_name = "%s"
-	ORDER BY id ASC
-	LIMIT 1`, mapName, playerName)
-	row = db.QueryRow(query)
-	var firstRun int
-	err = row.Scan(&firstRun)
-	if err != nil {
-		log.Printf("[DISCORD] Failed to retrieve last run for player %s on map %s: %v", playerName, mapName, err)
-		return nil
-	}
-	playerInfo.FirstRun = ConvertSecondsToTimer(firstRun)
-
-	query = fmt.Sprintf(`
-	SELECT SUM(time_score)
-	FROM "%s"
-	WHERE player_name = "%s"`, mapName, playerName)
-	row = db.QueryRow(query)
-	var totalTime int
-	err = row.Scan(&totalTime)
-	if err != nil {
-		log.Printf("[DISCORD] Failed to retrieve total time for player %s on map %s: %v", playerName, mapName, err)
-		return nil
-	}
-	playerInfo.TotalTime = ConvertSecondsToTimer(totalTime)
-
-	query = fmt.Sprintf(`
-	SELECT COUNT(time_score)
-	FROM "%s"
-	WHERE player_name = "%s" AND time_score = %d`, mapName, playerName, bestTime)
-	row = db.QueryRow(query)
-	err = row.Scan(&playerInfo.BestTimeAmount)
-	if err != nil {
-		log.Printf("[DISCORD] Failed to retrieve best time amount for player %s on map %s: %v", playerName, mapName, err)
+		if err == sql.ErrNoRows {
+			return &PlayerInfo{}
+		}
+		log.Printf("[DISCORD] Failed to retrieve player info for %s on map %s: %v", playerName, mapName, err)
 		return nil
 	}
 
-	query = fmt.Sprintf(`
-	SELECT MAX(time_score)
-	FROM "%s"
-	WHERE player_name = "%s"`, mapName, playerName)
-
-	row = db.QueryRow(query)
-	var slowestTime int
-	err = row.Scan(&slowestTime)
-	if err != nil {
-		log.Printf("[DISCORD] Failed to retrieve best time for player %s on map %s: %v", playerName, mapName, err)
-		return nil
+	var bestTimeAmount string
+	if bestTime.Valid {
+		countQuery := fmt.Sprintf(`SELECT COUNT(time_score) FROM "%s" WHERE player_name = ? AND time_score = ?`, mapName)
+		err = db.QueryRow(countQuery, playerName, bestTime.Int64).Scan(&bestTimeAmount)
+		if err != nil {
+			log.Printf("[DISCORD] Failed to retrieve best time amount for player %s on map %s: %v", playerName, mapName, err)
+			return nil
+		}
 	}
-	playerInfo.SlowestRun = ConvertSecondsToTimer(slowestTime)
 
-	return playerInfo
-
+	return &PlayerInfo{
+		BestTime:       ConvertSecondsToTimer(int(bestTime.Int64)),
+		TotalRuns:      int(totalRuns.Int64),
+		LastRun:        ConvertSecondsToTimer(int(lastRun.Int64)),
+		FirstRun:       ConvertSecondsToTimer(int(firstRun.Int64)),
+		TotalTime:      ConvertSecondsToTimer(int(totalTime.Int64)),
+		BestTimeAmount: bestTimeAmount,
+		SlowestRun:     ConvertSecondsToTimer(int(slowestTime.Int64)),
+	}
 }

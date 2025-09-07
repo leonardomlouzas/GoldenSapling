@@ -30,5 +30,8 @@ func PlayerInfo(db *sql.DB, playerName, mapName string, allowedMaps []config.Map
 			{Name: "First Run", Value: entry.FirstRun, Inline: true},
 			{Name: "Total Time", Value: entry.TotalTime, Inline: true},
 		},
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "/last_runs to see most recent runs",
+		},
 	}
 }
