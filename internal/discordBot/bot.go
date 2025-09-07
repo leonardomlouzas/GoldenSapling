@@ -66,7 +66,7 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        "zAdd",
+			Name:        "zadd",
 			Description: "[ADMIN ONLY] Manually add a new run",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -90,7 +90,7 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        "zRemove",
+			Name:        "zremove",
 			Description: "[ADMIN ONLY] Manually remove a specific run or all runs from a player",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -114,7 +114,7 @@ func (b *Bot) getCommands() []*discordgo.ApplicationCommand {
 			},
 		},
 		{
-			Name:        "zRename",
+			Name:        "zrename",
 			Description: "[ADMIN ONLY] Rename a player nickname to a new one",
 			Options: []*discordgo.ApplicationCommandOption{
 				{

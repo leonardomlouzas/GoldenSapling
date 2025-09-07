@@ -2,7 +2,6 @@ package automation
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -19,6 +18,7 @@ type NewRunners struct {
 	channelID      string
 	folderPath     string
 	db             *sql.DB
+	allowedMaps    []config.MapInfo
 }
 
 func NewRunnersService(s *discordgo.Session, db *sql.DB, cfg *config.Config) *NewRunners {
@@ -32,6 +32,7 @@ func NewRunnersService(s *discordgo.Session, db *sql.DB, cfg *config.Config) *Ne
 		updateInterval: cfg.UpdateInterval,
 		folderPath:     cfg.NewRunsPath,
 		db:             db,
+		allowedMaps:    cfg.AllowedMaps,
 	}
 }
 
@@ -51,6 +52,40 @@ func (sc *NewRunners) Start() {
 	}()
 }
 
+func (sc *NewRunners) insertRunsInBatch(mapName string, runs []helpers.NewRunEntry) error {
+	if !helpers.IsValidTable(mapName, sc.allowedMaps) {
+		log.Printf("[SECURITY] Attempted to insert runs into an invalid table: %s", mapName)
+		return nil // Or return an error, but we don't want to stop the whole process
+	}
+
+	tx, err := sc.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() // Rollback on any error
+
+	stmt, err := tx.Prepare(`INSERT INTO "` + mapName + `" (player_name, time_score) VALUES (?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, run := range runs {
+		timeInt, err := strconv.Atoi(run.TimeScore)
+		if err != nil {
+			log.Printf("[DISCORD] Invalid time score for %s on map %s, skipping run: %v", run.PlayerName, mapName, err)
+			continue // Skip this run, but continue with others in the batch
+		}
+
+		if _, err := stmt.Exec(run.PlayerName, timeInt); err != nil {
+			// The defer tx.Rollback() will handle this
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (sc *NewRunners) updateNewRunners() {
 	if sc == nil {
 		return // Service is disabled
@@ -62,8 +97,12 @@ func (sc *NewRunners) updateNewRunners() {
 		return
 	}
 
-	entries := make(map[string][]helpers.NewRunEntry)
+	// A map to hold new run entries, keyed by map name.
+	runEntries := make(map[string][]helpers.NewRunEntry)
+	// A map to hold file paths for each map, to be deleted after successful DB insertion.
+	filePathsByMap := make(map[string][]string)
 
+	// 1. Read all files and group runs by map name.
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -79,47 +118,39 @@ func (sc *NewRunners) updateNewRunners() {
 		}
 
 		entry := helpers.NewRunReader(content)
-		entries[entry.MapName] = append(entries[entry.MapName], entry)
-
-		// DB INSERT
-		timeInt, err := strconv.Atoi(entry.TimeScore)
-		if err != nil {
-			log.Printf("[DISCORD] Invalid time score for %s: %v", entry.PlayerName, err)
-		} else {
-			_, err = sc.db.Exec(
-				fmt.Sprintf(`INSERT INTO "%s" (player_name, time_score) VALUES (?, ?)`, entry.MapName),
-				entry.PlayerName, timeInt,
-			)
-			if err != nil {
-				log.Printf("[DISCORD] Failed to insert new run for %s (%s) in %s: %v", entry.PlayerName, entry.TimeScore, entry.MapName, err)
-			}
-		}
-		//
-
-		err = os.Remove(filePath)
-		if err != nil {
-			log.Printf("[DISCORD] Failed to delete file %s", err)
-			continue
-		}
+		runEntries[entry.MapName] = append(runEntries[entry.MapName], entry)
+		filePathsByMap[entry.MapName] = append(filePathsByMap[entry.MapName], filePath)
 	}
 
-	for mapName, newEntries := range entries {
+	// 2. Insert runs into the database in batches and send Discord notifications.
+	for mapName, newEntries := range runEntries {
 		if len(newEntries) == 0 {
 			continue
 		}
+
+		if err := sc.insertRunsInBatch(mapName, newEntries); err != nil {
+			log.Printf("[DISCORD] Failed to insert batch of new runs for map %s: %v. Files will not be deleted.", mapName, err)
+			continue // Move to the next map
+		}
+
+		// 3. Send notifications to Discord in chunks of 10.
 		for len(newEntries) > 10 {
 			_, err = sc.session.ChannelMessageSend(sc.channelID, helpers.NewRunTable(newEntries[:10]))
 			if err != nil {
 				log.Printf("[DISCORD] Failed to send new runs for map %s: %v", mapName, err)
-				continue
 			}
 			newEntries = newEntries[10:]
 		}
-
 		_, err = sc.session.ChannelMessageSend(sc.channelID, helpers.NewRunTable(newEntries))
 		if err != nil {
 			log.Printf("[DISCORD] Failed to send new runs for map %s: %v", mapName, err)
-			continue
+		}
+
+		// 4. Delete the processed files.
+		for _, path := range filePathsByMap[mapName] {
+			if err := os.Remove(path); err != nil {
+				log.Printf("[DISCORD] Failed to delete processed run file %s: %v", path, err)
+			}
 		}
 	}
 }
