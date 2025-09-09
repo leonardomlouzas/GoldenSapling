@@ -10,7 +10,7 @@ import (
 
 func LastRunsReader(db *sql.DB, playerName, mapName string, allowedMaps []config.MapInfo) []LeaderboardEntry {
 	if !IsValidTable(mapName, allowedMaps) {
-		log.Printf("[SECURITY] Attempted to query an invalid table name: %s", mapName)
+		log.Printf("[DISCORD] Attempted to query an invalid table name: %s", mapName)
 		return nil
 	}
 
@@ -18,7 +18,7 @@ func LastRunsReader(db *sql.DB, playerName, mapName string, allowedMaps []config
 		SELECT player_name, time_score
 		FROM %s
 		WHERE player_name = ?
-		ORDER BY time_score ASC
+		ORDER BY id DESC
 		LIMIT 10`, mapName)
 
 	rows, err := db.Query(query, playerName)

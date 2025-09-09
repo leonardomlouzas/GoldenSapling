@@ -18,7 +18,7 @@ type LeaderboardEntry struct {
 
 func LeaderboardReader(db *sql.DB, mapName string, allowedMaps []config.MapInfo) []LeaderboardEntry {
 	if !IsValidTable(mapName, allowedMaps) {
-		log.Printf("[SECURITY] Attempted to query an invalid table name: %s", mapName)
+		log.Printf("[DISCORD] Attempted to query an invalid table name: %s", mapName)
 		return nil
 	}
 

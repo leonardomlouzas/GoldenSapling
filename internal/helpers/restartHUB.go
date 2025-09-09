@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -23,12 +22,10 @@ func RestartHUB(exePath string) error {
 	fmt.Printf("Restarting HUB at %s\n", currentTime)
 
 	hubExePath := filepath.Join(exePath, "r5apex_ds.exe")
-	if _, err := os.Stat(hubExePath); err != nil {
-		return fmt.Errorf("r5apex_ds.exe not found at %s: %w", hubExePath, err)
-	}
+	cmd := exec.Command(hubExePath)
+	cmd.Dir = exePath
 
-	startCmd := exec.Command(hubExePath)
-	if err := startCmd.Start(); err != nil {
+	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start r5apex_ds: %s", err)
 	}
 

@@ -168,7 +168,11 @@ func New(cfg *config.Config) (*Bot, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlite3", cfg.DBPath)
+	// Adds _busy_timeout to the DSN. This tells SQLite to wait for the specified
+	// duration if the database is locked, preventing "database is locked" errors
+	// during concurrent access. 5000ms (5 seconds) is a safe value.
+	dsn := fmt.Sprintf("%s?_busy_timeout=5000", cfg.DBPath)
+	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}

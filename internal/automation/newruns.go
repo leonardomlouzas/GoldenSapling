@@ -54,7 +54,7 @@ func (sc *NewRunners) Start() {
 
 func (sc *NewRunners) insertRunsInBatch(mapName string, runs []helpers.NewRunEntry) error {
 	if !helpers.IsValidTable(mapName, sc.allowedMaps) {
-		log.Printf("[SECURITY] Attempted to insert runs into an invalid table: %s", mapName)
+		log.Printf("[DISCORD] Attempted to insert runs into an invalid table: %s", mapName)
 		return nil // Or return an error, but we don't want to stop the whole process
 	}
 
@@ -97,12 +97,9 @@ func (sc *NewRunners) updateNewRunners() {
 		return
 	}
 
-	// A map to hold new run entries, keyed by map name.
 	runEntries := make(map[string][]helpers.NewRunEntry)
-	// A map to hold file paths for each map, to be deleted after successful DB insertion.
 	filePathsByMap := make(map[string][]string)
 
-	// 1. Read all files and group runs by map name.
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -122,7 +119,6 @@ func (sc *NewRunners) updateNewRunners() {
 		filePathsByMap[entry.MapName] = append(filePathsByMap[entry.MapName], filePath)
 	}
 
-	// 2. Insert runs into the database in batches and send Discord notifications.
 	for mapName, newEntries := range runEntries {
 		if len(newEntries) == 0 {
 			continue
@@ -130,10 +126,9 @@ func (sc *NewRunners) updateNewRunners() {
 
 		if err := sc.insertRunsInBatch(mapName, newEntries); err != nil {
 			log.Printf("[DISCORD] Failed to insert batch of new runs for map %s: %v. Files will not be deleted.", mapName, err)
-			continue // Move to the next map
+			continue
 		}
 
-		// 3. Send notifications to Discord in chunks of 10.
 		for len(newEntries) > 10 {
 			_, err = sc.session.ChannelMessageSend(sc.channelID, helpers.NewRunTable(newEntries[:10]))
 			if err != nil {
@@ -146,7 +141,6 @@ func (sc *NewRunners) updateNewRunners() {
 			log.Printf("[DISCORD] Failed to send new runs for map %s: %v", mapName, err)
 		}
 
-		// 4. Delete the processed files.
 		for _, path := range filePathsByMap[mapName] {
 			if err := os.Remove(path); err != nil {
 				log.Printf("[DISCORD] Failed to delete processed run file %s: %v", path, err)

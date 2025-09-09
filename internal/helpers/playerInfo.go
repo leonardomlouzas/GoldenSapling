@@ -20,7 +20,7 @@ type PlayerInfo struct {
 
 func PlayerInfoReader(db *sql.DB, playerName string, mapName string, allowedMaps []config.MapInfo) *PlayerInfo {
 	if !IsValidTable(mapName, allowedMaps) {
-		log.Printf("[SECURITY] Attempted to query an invalid table name: %s", mapName)
+		log.Printf("[DISCORD] Attempted to query an invalid table name: %s", mapName)
 		return nil
 	}
 

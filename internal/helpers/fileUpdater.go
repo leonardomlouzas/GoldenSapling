@@ -137,7 +137,7 @@ func retrieveTop10(db *sql.DB, allowedMaps []config.MapInfo) map[string][]Leader
 		)
 		GROUP BY player_name
 		ORDER BY best_time ASC, id DESC
-		LIMIT 10;
+		LIMIT 7 OFFSET 3;
 		`, mapInfo.MapName)
 		rows, err := db.Query(query)
 		if err != nil {
