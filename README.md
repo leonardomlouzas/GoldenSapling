@@ -28,6 +28,15 @@ The bot provides several commands to interact with the speedrun data:
 
 ## Setup
 
+### DB
+
+Create a sqlite database with the following information:
+
+- table names should be map names and will be added in the .env for the bot interaction.
+- table fields should contain `ID` as an auto-increment primary key, `player_name` as a text field and `time_score` as an integer field.
+
+### BOT
+
 0. Make sure you have Go and a C compiler installed on your machine.
 1. Clone the repository.
 2. Remove the `.example` from the `.env` file in the root directory and add your environment variables.
