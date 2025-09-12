@@ -14,12 +14,13 @@ func UpdateTop10File(filepath string, db *sql.DB, allowedMaps []config.MapInfo) 
 	top3 := retrieveTop3(db, allowedMaps)
 	top10 := retrieveTop10(db, allowedMaps)
 
+	top1names := ``
+	top2names := ``
 	top3names := ``
+	top10names := ``
 	ingameLB := ``
 	for name, maap := range top3 {
 		for _, player := range maap {
-			top3names += fmt.Sprintf(`"%s",`, player.PlayerName)
-
 			switch name {
 			case "firstmap":
 				switch player.Rank {
@@ -61,22 +62,42 @@ func UpdateTop10File(filepath string, db *sql.DB, allowedMaps []config.MapInfo) 
 			}
 		}
 	}
-	if len(top3names) > 0 {
-		top3names = top3names[:len(top3names)-1]
-	}
 
-	top10names := ``
-	for _, maap := range top10 {
+	for _, maap := range top3 {
 		for _, player := range maap {
-			top10names += fmt.Sprintf(`"%s",`, player.PlayerName)
+			switch player.Rank {
+			case 1:
+				top1names += fmt.Sprintf(`"%s", `, player.PlayerName)
+			case 2:
+				top2names += fmt.Sprintf(`"%s", `, player.PlayerName)
+			case 3:
+				top3names += fmt.Sprintf(`"%s", `, player.PlayerName)
+			}
 		}
 	}
+	for _, maap := range top10 {
+		for _, player := range maap {
+			top10names += fmt.Sprintf(`"%s", `, player.PlayerName)
+		}
+	}
+
+	if len(top1names) > 0 {
+		top1names = top1names[:len(top1names)-2]
+	}
+	if len(top2names) > 0 {
+		top2names = top2names[:len(top2names)-2]
+	}
+	if len(top3names) > 0 {
+		top3names = top3names[:len(top3names)-2]
+	}
 	if len(top10names) > 0 {
-		top10names = top10names[:len(top10names)-1]
+		top10names = top10names[:len(top10names)-2]
 	}
 
 	lines := "untyped\n\n"
 	lines += "globalize_all_functions\n\n"
+	lines += fmt.Sprintf("global const array <string> top1_players = [%s]\n", top1names)
+	lines += fmt.Sprintf("global const array <string> top2_players = [%s]\n", top2names)
 	lines += fmt.Sprintf("global const array <string> top3_players = [%s]\n", top3names)
 	lines += fmt.Sprintf("global const array <string> top10_players = [%s]\n\n", top10names)
 	lines += "void function MH_Spawn_Leaderboards(entity player) {\n"
@@ -85,6 +106,9 @@ func UpdateTop10File(filepath string, db *sql.DB, allowedMaps []config.MapInfo) 
 	os.WriteFile(filepath, []byte(lines), 0777)
 }
 
+/*
+Returns the 1-3 positions
+*/
 func retrieveTop3(db *sql.DB, allowedMaps []config.MapInfo) map[string][]LeaderboardEntry {
 	top3Players := make(map[string][]LeaderboardEntry)
 	for _, mapInfo := range allowedMaps {
@@ -124,6 +148,9 @@ func retrieveTop3(db *sql.DB, allowedMaps []config.MapInfo) map[string][]Leaderb
 	return top3Players
 }
 
+/*
+Returns the 4-10 positions
+*/
 func retrieveTop10(db *sql.DB, allowedMaps []config.MapInfo) map[string][]LeaderboardEntry {
 	top10Players := make(map[string][]LeaderboardEntry)
 	for _, mapInfo := range allowedMaps {
@@ -146,7 +173,7 @@ func retrieveTop10(db *sql.DB, allowedMaps []config.MapInfo) map[string][]Leader
 		}
 
 		var players []LeaderboardEntry
-		rank := 1
+		rank := 4
 
 		for rows.Next() {
 			var entry LeaderboardEntry
