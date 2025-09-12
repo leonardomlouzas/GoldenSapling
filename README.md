@@ -40,5 +40,5 @@ Create a sqlite database with the following information:
 0. Make sure you have Go and a C compiler installed on your machine.
 1. Clone the repository.
 2. Remove the `.example` from the `.env` file in the root directory and add your environment variables.
-3. Run `go build` to compile the bot.
+3. Run `go build -ldflags "-s -w" -o goldenSapling.exe` to compile the bot.
 4. Execute the compiled binary to start the bot.
