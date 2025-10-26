@@ -18,6 +18,7 @@ type Config struct {
 	DiscordBotToken       string
 	DiscordGuildID        string
 	BannedWords           string
+	ForbiddenChannelID    string
 	PlayerCountChannelID  string
 	R5RServerListURL      string
 	UpdateInterval        time.Duration
@@ -74,5 +75,6 @@ func NewConfig() *Config {
 		Top10FilePath:         os.Getenv("TOP_10_FILE_PATH"),
 		GamePath:              os.Getenv("GAME_PATH"),
 		AdminIDs:              admins,
+		ForbiddenChannelID:    os.Getenv("FORBIDDEN_CHANNEL_ID"),
 	}
 }

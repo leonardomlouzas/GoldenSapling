@@ -9,7 +9,8 @@ import (
 )
 
 type AutoBan struct {
-	bannedWords []string
+	bannedWords        []string
+	forbiddenChannelID string
 }
 
 /*
@@ -29,15 +30,27 @@ func NewAutoBan(cfg *config.Config) *AutoBan {
 	}
 
 	return &AutoBan{
-		bannedWords: processedWords,
+		bannedWords:        processedWords,
+		forbiddenChannelID: cfg.ForbiddenChannelID,
 	}
 }
 
 /*
-Checks if the message content contains any of the banned words and bans the author if it does.
+Checks if the message content contains any of the banned words and bans the author if it does, pruning his messages from the previous 2 days.
 */
 func (ab *AutoBan) MessageCreateHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
+		return
+	}
+
+	// If the message was sent in the configured forbidden channel, ban immediately.
+	if ab.forbiddenChannelID != "" && m.ChannelID == ab.forbiddenChannelID {
+		err := s.GuildBanCreateWithReason(m.GuildID, m.Author.ID, "Automatic ban: Posting in forbidden channel.", 2)
+		if err != nil {
+			log.Printf("[DISCORD] Failed to auto-ban user %s (%s) for posting in forbidden channel: %v", m.Author.Username, m.Author.ID, err)
+		} else {
+			log.Printf("[DISCORD] User %s (%s) has been banned for posting in forbidden channel. Deleted messages from previous 2 days.", m.Author.Username, m.Author.ID)
+		}
 		return
 	}
 
@@ -45,11 +58,11 @@ func (ab *AutoBan) MessageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 
 	for _, word := range ab.bannedWords {
 		if strings.Contains(messageContent, word) {
-			err := s.GuildBanCreateWithReason(m.GuildID, m.Author.ID, "Automatic ban: Use of forbidden language.", 0)
+			err := s.GuildBanCreateWithReason(m.GuildID, m.Author.ID, "Automatic ban: Use of forbidden language.", 2)
 			if err != nil {
 				log.Printf("[DISCORD] Failed to auto-ban user %s (%s): %v", m.Author.Username, m.Author.ID, err)
 			} else {
-				log.Printf("[DISCORD] User %s (%s) has been banned for using a forbidden word.", m.Author.Username, m.Author.ID)
+				log.Printf("[DISCORD] User %s (%s) has been banned for using a forbidden word. Deleted messages from previous 2 days.", m.Author.Username, m.Author.ID)
 			}
 			return
 		}
