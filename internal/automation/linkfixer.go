@@ -29,7 +29,7 @@ func NewLinkFixer() (*LinkFixer, error) {
 		{
 			name:              "Twitter/X",
 			regexStr:          `https?://(?:www\.)?(twitter|x)\.com/(\w+/status/\d+)`,
-			replacement:       "https://fxtwitter.com/%s",
+			replacement:       "https://skibidix.com/%s",
 			captureGroupIndex: 2,
 		},
 		{

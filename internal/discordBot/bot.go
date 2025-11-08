@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
@@ -271,6 +272,7 @@ Runs the Discord bot, setting up event handlers and starting the session.
 func (b *Bot) Run() {
 	b.Session.AddHandler(b.ready)
 	b.Session.AddHandler(b.interactionCreate)
+	b.Session.AddHandler(b.messageCreate)
 	b.Session.AddHandler(b.AutoBan.MessageCreateHandler)
 	b.Session.AddHandler(b.LinkFixer.MessageCreateHandler)
 	b.Session.AddHandler(b.TempMessenger.MessageCreateHandler)
@@ -292,6 +294,46 @@ func (b *Bot) Run() {
 	log.Println("[DISCORD] Shutting down bot...")
 	b.DB.Close()
 	b.Session.Close()
+}
+
+/*
+Log user messages, ignoring commands. Enable it via LOG_MESSAGES=true in the .env
+*/
+func (b *Bot) messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if b.Config == nil || !b.Config.LogMessages {
+		return
+	}
+	if m.Author == nil || m.Author.Bot {
+		return
+	}
+
+	content := strings.TrimSpace(m.Content)
+	if content == "" {
+		return
+	}
+	if strings.HasPrefix(content, "/") || strings.HasPrefix(content, ">") {
+		return
+	}
+
+	channelName := m.ChannelID
+	guildName := "UNKNOWN"
+	if ch, err := s.Channel(m.ChannelID); err == nil && ch != nil {
+		if ch.Name != "" {
+			channelName = ch.Name
+		}
+		if ch.GuildID != "" {
+			// Prefer the API call, fall back to state cache if needed
+			if g, err := s.Guild(ch.GuildID); err == nil && g != nil && g.Name != "" {
+				guildName = g.Name
+			} else {
+				if gs, _ := s.State.Guild(ch.GuildID); gs != nil && gs.Name != "" {
+					guildName = gs.Name
+				}
+			}
+		}
+	}
+
+	log.Printf("[LOG] [%s %s] (%s): %s", guildName, channelName, m.Author.Username, content)
 }
 
 /*

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ type Config struct {
 	Top10FilePath         string
 	GamePath              string
 	AdminIDs              []string
+	LogMessages           bool
 }
 
 func NewConfig() *Config {
@@ -60,6 +62,14 @@ func NewConfig() *Config {
 	adminsEnv := os.Getenv("ADMIN_IDS")
 	admins := strings.Split(adminsEnv, ",")
 
+	// Parse LOG_MESSAGES env var into a boolean. Defaults to false.
+	logMessages := false
+	if lm := os.Getenv("LOG_MESSAGES"); lm != "" {
+		if parsed, err := strconv.ParseBool(lm); err == nil {
+			logMessages = parsed
+		}
+	}
+
 	return &Config{
 		DiscordBotToken:       os.Getenv("DISCORD_BOT_TOKEN"),
 		DiscordGuildID:        os.Getenv("DISCORD_GUILD_ID"),
@@ -75,6 +85,7 @@ func NewConfig() *Config {
 		Top10FilePath:         os.Getenv("TOP_10_FILE_PATH"),
 		GamePath:              os.Getenv("GAME_PATH"),
 		AdminIDs:              admins,
+		LogMessages:           logMessages,
 		ForbiddenChannelID:    os.Getenv("FORBIDDEN_CHANNEL_ID"),
 	}
 }
